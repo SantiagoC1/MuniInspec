@@ -1,0 +1,998 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Inspecciones — Sistema Municipal</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  /* ── Reset & Base ─────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --azul:        #1a56db;
+    --azul-dark:   #1141a8;
+    --azul-light:  #e8f0fe;
+    --azul-muted:  #6b8fd8;
+    --gris-1:      #f4f6fa;
+    --gris-2:      #e9ecf2;
+    --gris-3:      #c8cdd8;
+    --gris-4:      #8892a4;
+    --gris-5:      #4a5568;
+    --negro:       #1a202c;
+    --blanco:      #ffffff;
+    --verde:       #22c55e;
+    --rojo:        #ef4444;
+    --naranja:     #f59e0b;
+
+    --font-main:   'Inter', system-ui, -apple-system, sans-serif;
+    --font-mono:   'JetBrains Mono', 'Fira Code', monospace;
+
+    --radius:      6px;
+    --shadow-sm:   0 1px 3px rgba(0,0,0,.08);
+    --shadow-md:   0 4px 12px rgba(0,0,0,.10);
+    --transition:  .15s ease;
+  }
+
+  html { font-size: 15px; }
+  body {
+    font-family: var(--font-main);
+    background: var(--gris-1);
+    color: var(--negro);
+    min-height: 100vh;
+    line-height: 1.5;
+  }
+
+  /* ── Topbar ───────────────────────────────────────────────── */
+  .topbar {
+    background: var(--azul);
+    color: var(--blanco);
+    height: 52px;
+    display: flex;
+    align-items: center;
+    padding: 0 24px;
+    gap: 12px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 2px 8px rgba(26,86,219,.3);
+  }
+  .topbar-icon {
+    width: 28px; height: 28px;
+    background: rgba(255,255,255,.15);
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px;
+  }
+  .topbar-title { font-size: .95rem; font-weight: 600; letter-spacing: .01em; }
+  .topbar-sub   { font-size: .78rem; opacity: .7; margin-left: 4px; }
+  .topbar-spacer { flex: 1; }
+  .topbar-status {
+    font-size: .75rem; opacity: .8;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--verde);
+    box-shadow: 0 0 6px var(--verde);
+  }
+  .dot.off { background: var(--gris-3); box-shadow: none; }
+
+  /* ── Nav tabs ─────────────────────────────────────────────── */
+  .nav {
+    background: var(--blanco);
+    border-bottom: 1px solid var(--gris-2);
+    display: flex;
+    padding: 0 24px;
+    gap: 2px;
+    position: sticky;
+    top: 52px;
+    z-index: 99;
+  }
+  .nav-btn {
+    padding: 12px 18px;
+    font-size: .85rem;
+    font-weight: 500;
+    color: var(--gris-4);
+    border: none;
+    background: none;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: color var(--transition), border-color var(--transition);
+    display: flex; align-items: center; gap: 6px;
+  }
+  .nav-btn:hover { color: var(--azul); }
+  .nav-btn.active {
+    color: var(--azul);
+    border-bottom-color: var(--azul);
+    font-weight: 600;
+  }
+
+  /* ── Layout ───────────────────────────────────────────────── */
+  .main { max-width: 1200px; margin: 0 auto; padding: 24px 20px; }
+
+  .section { display: none; }
+  .section.active { display: block; }
+
+  /* ── Cards ────────────────────────────────────────────────── */
+  .card {
+    background: var(--blanco);
+    border: 1px solid var(--gris-2);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-sm);
+  }
+  .card-header {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--gris-2);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .card-title {
+    font-size: .85rem;
+    font-weight: 600;
+    color: var(--gris-5);
+    text-transform: uppercase;
+    letter-spacing: .06em;
+  }
+  .card-body { padding: 18px; }
+
+  /* ── KPI strip ────────────────────────────────────────────── */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .kpi {
+    background: var(--blanco);
+    border: 1px solid var(--gris-2);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+    box-shadow: var(--shadow-sm);
+  }
+  .kpi-label {
+    font-size: .73rem;
+    color: var(--gris-4);
+    text-transform: uppercase;
+    letter-spacing: .07em;
+    margin-bottom: 6px;
+  }
+  .kpi-value {
+    font-size: 1.9rem;
+    font-weight: 700;
+    color: var(--azul);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .kpi-sub { font-size: .75rem; color: var(--gris-4); margin-top: 4px; }
+
+  /* ── Charts row ───────────────────────────────────────────── */
+  .charts-row {
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+  @media (max-width: 780px) { .charts-row { grid-template-columns: 1fr; } }
+
+  .chart-wrap {
+    position: relative;
+    height: 280px;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  /* ── Selector de mes ─────────────────────────────────────── */
+  .toolbar {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+  .toolbar-label { font-size: .82rem; color: var(--gris-5); font-weight: 500; }
+
+  select, input[type="text"], input[type="date"], input[type="number"] {
+    height: 36px;
+    padding: 0 10px;
+    border: 1px solid var(--gris-3);
+    border-radius: var(--radius);
+    font-size: .85rem;
+    font-family: var(--font-main);
+    color: var(--negro);
+    background: var(--blanco);
+    outline: none;
+    transition: border-color var(--transition), box-shadow var(--transition);
+  }
+  select:focus, input:focus {
+    border-color: var(--azul);
+    box-shadow: 0 0 0 3px rgba(26,86,219,.12);
+  }
+
+  /* ── Tabla ────────────────────────────────────────────────── */
+  .table-wrap {
+    overflow-x: auto;
+    border-radius: var(--radius);
+    border: 1px solid var(--gris-2);
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: .82rem;
+  }
+  th {
+    background: var(--gris-1);
+    color: var(--gris-5);
+    font-weight: 600;
+    font-size: .73rem;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    padding: 10px 12px;
+    text-align: left;
+    border-bottom: 1px solid var(--gris-2);
+    white-space: nowrap;
+  }
+  td {
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--gris-2);
+    color: var(--gris-5);
+    vertical-align: middle;
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--gris-1); }
+
+  /* ── Badge concepto ───────────────────────────────────────── */
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-size: .72rem;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  .badge-h  { background: #dbeafe; color: #1d4ed8; }
+  .badge-d  { background: #dcfce7; color: #166534; }
+  .badge-e  { background: #fef9c3; color: #854d0e; }
+  .badge-g  { background: #fce7f3; color: #9d174d; }
+  .badge-r  { background: #ffedd5; color: #9a3412; }
+  .badge-t  { background: #f3e8ff; color: #6b21a8; }
+  .badge-ev { background: #e0f2fe; color: #0369a1; }
+  .badge-o  { background: var(--gris-2); color: var(--gris-5); }
+
+  /* ── Formulario de carga ─────────────────────────────────── */
+  .form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  @media (max-width: 600px) { .form-grid { grid-template-columns: 1fr; } }
+
+  .form-group { display: flex; flex-direction: column; gap: 5px; }
+  .form-group.full { grid-column: 1 / -1; }
+
+  label {
+    font-size: .78rem;
+    font-weight: 600;
+    color: var(--gris-5);
+    text-transform: uppercase;
+    letter-spacing: .05em;
+  }
+  label .req { color: var(--rojo); margin-left: 2px; }
+
+  select, input {
+    width: 100%;
+  }
+
+  .btn {
+    height: 38px;
+    padding: 0 20px;
+    border: none;
+    border-radius: var(--radius);
+    font-size: .85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background var(--transition), transform var(--transition);
+    display: inline-flex; align-items: center; gap: 7px;
+  }
+  .btn:active { transform: scale(.98); }
+  .btn-primary { background: var(--azul); color: var(--blanco); }
+  .btn-primary:hover { background: var(--azul-dark); }
+  .btn-secondary { background: var(--gris-2); color: var(--gris-5); }
+  .btn-secondary:hover { background: var(--gris-3); }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+
+  /* ── Legajo autofill ──────────────────────────────────────── */
+  .legajo-display {
+    height: 36px;
+    padding: 0 10px;
+    border: 1px dashed var(--gris-3);
+    border-radius: var(--radius);
+    background: var(--gris-1);
+    display: flex; align-items: center;
+    font-size: .85rem;
+    color: var(--gris-4);
+    font-family: var(--font-mono);
+  }
+
+  /* ── Toast ────────────────────────────────────────────────── */
+  .toast-container {
+    position: fixed;
+    bottom: 24px; right: 24px;
+    display: flex; flex-direction: column; gap: 8px;
+    z-index: 999;
+  }
+  .toast {
+    padding: 12px 18px;
+    border-radius: var(--radius);
+    font-size: .84rem;
+    font-weight: 500;
+    color: var(--blanco);
+    box-shadow: var(--shadow-md);
+    display: flex; align-items: center; gap: 8px;
+    animation: slideIn .2s ease;
+    max-width: 320px;
+  }
+  .toast.ok  { background: #166534; }
+  .toast.err { background: #991b1b; }
+  @keyframes slideIn {
+    from { transform: translateX(40px); opacity: 0; }
+    to   { transform: translateX(0);    opacity: 1; }
+  }
+
+  /* ── Skeleton / loader ────────────────────────────────────── */
+  .skeleton {
+    background: linear-gradient(90deg, var(--gris-2) 25%, var(--gris-1) 50%, var(--gris-2) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.2s infinite;
+    border-radius: 4px;
+    height: 14px;
+  }
+  @keyframes shimmer { to { background-position: -200% 0; } }
+
+  .empty {
+    text-align: center;
+    padding: 48px 20px;
+    color: var(--gris-4);
+    font-size: .88rem;
+  }
+  .empty-icon { font-size: 2rem; margin-bottom: 8px; }
+
+  /* ── Inspector list en stats ──────────────────────────────── */
+  .insp-list { display: flex; flex-direction: column; gap: 6px; }
+  .insp-row  { display: flex; align-items: center; gap: 8px; font-size: .82rem; }
+  .insp-name { color: var(--gris-5); min-width: 160px; }
+  .insp-bar-wrap {
+    flex: 1;
+    height: 8px;
+    background: var(--gris-2);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .insp-bar {
+    height: 100%;
+    background: var(--azul);
+    border-radius: 4px;
+    transition: width .4s ease;
+  }
+  .insp-num { color: var(--gris-4); min-width: 28px; text-align: right; font-variant-numeric: tabular-nums; }
+
+  /* ── Filtro tabla ─────────────────────────────────────────── */
+  .search-input { width: 220px; }
+
+  /* ── Paginación ───────────────────────────────────────────── */
+  .pagination {
+    display: flex; align-items: center; gap: 6px;
+    padding: 12px 16px;
+    border-top: 1px solid var(--gris-2);
+    font-size: .8rem;
+    color: var(--gris-4);
+  }
+  .page-btn {
+    height: 28px; width: 28px;
+    border: 1px solid var(--gris-3);
+    border-radius: 4px;
+    background: var(--blanco);
+    cursor: pointer;
+    font-size: .8rem;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .page-btn:hover { border-color: var(--azul); color: var(--azul); }
+  .page-btn.active { background: var(--azul); color: var(--blanco); border-color: var(--azul); }
+  .page-spacer { flex: 1; }
+</style>
+</head>
+<body>
+
+<!-- ── Topbar ─────────────────────────────────────────────── -->
+<header class="topbar">
+  <div class="topbar-icon">📋</div>
+  <span class="topbar-title">Inspecciones Municipales</span>
+  <span class="topbar-sub">La Plata</span>
+  <div class="topbar-spacer"></div>
+  <div class="topbar-status">
+    <div class="dot" id="dot"></div>
+    <span id="conn-label">Conectando…</span>
+  </div>
+</header>
+
+<!-- ── Nav ────────────────────────────────────────────────── -->
+<nav class="nav">
+  <button class="nav-btn active" data-tab="stats">📊 Estadísticas</button>
+  <button class="nav-btn"        data-tab="tabla">📋 Tabla de registros</button>
+  <button class="nav-btn"        data-tab="carga">➕ Cargar inspección</button>
+</nav>
+
+<!-- ── Main ───────────────────────────────────────────────── -->
+<main class="main">
+
+  <!-- ══ ESTADÍSTICAS ════════════════════════════════════════ -->
+  <section class="section active" id="tab-stats">
+
+    <div class="toolbar">
+      <span class="toolbar-label">Período:</span>
+      <select id="stats-mes-sel">
+        <option value="anual">Anual (todos los meses)</option>
+      </select>
+      <button class="btn btn-primary" id="btn-cargar-stats">Actualizar</button>
+    </div>
+
+    <!-- KPIs -->
+    <div class="kpi-grid" id="kpi-grid">
+      <div class="kpi"><div class="kpi-label">Registros</div><div class="kpi-value" id="kpi-total">—</div></div>
+      <div class="kpi"><div class="kpi-label">Días activos</div><div class="kpi-value" id="kpi-dias">—</div></div>
+      <div class="kpi"><div class="kpi-label">Inspectores</div><div class="kpi-value" id="kpi-insp">—</div></div>
+      <div class="kpi"><div class="kpi-label">Tasas cobradas</div><div class="kpi-value" id="kpi-tasas">—</div></div>
+    </div>
+
+    <!-- Gráficos -->
+    <div class="charts-row">
+      <div class="card">
+        <div class="card-header"><span class="card-title">Distribución por Concepto</span></div>
+        <div class="card-body">
+          <div class="chart-wrap"><canvas id="chart-torta"></canvas></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="card-title">Registros por Inspector</span></div>
+        <div class="card-body" style="overflow-y:auto; max-height:316px;">
+          <div class="insp-list" id="insp-list"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabla por concepto -->
+    <div class="card">
+      <div class="card-header"><span class="card-title">Detalle por Concepto</span></div>
+      <div class="table-wrap">
+        <table id="tbl-concepto">
+          <thead>
+            <tr><th>Concepto</th><th>Cantidad</th><th>% del total</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- ══ TABLA ═══════════════════════════════════════════════ -->
+  <section class="section" id="tab-tabla">
+
+    <div class="toolbar">
+      <span class="toolbar-label">Mes:</span>
+      <select id="tabla-mes-sel"></select>
+      <button class="btn btn-primary" id="btn-cargar-tabla">Cargar</button>
+      <div class="page-spacer"></div>
+      <input type="text" class="search-input" placeholder="🔍 Buscar…" id="tabla-search">
+    </div>
+
+    <div class="card">
+      <div class="table-wrap">
+        <table id="tbl-main">
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Dirección</th>
+              <th>Horario</th>
+              <th>Inspector</th>
+              <th>Concepto</th>
+              <th>Tasas</th>
+              <th>Boleta</th>
+              <th>Observación</th>
+            </tr>
+          </thead>
+          <tbody id="tbl-body"></tbody>
+        </table>
+      </div>
+      <div class="pagination" id="pagination"></div>
+    </div>
+
+  </section>
+
+  <!-- ══ CARGA ════════════════════════════════════════════════ -->
+  <section class="section" id="tab-carga">
+    <div class="card" style="max-width:700px;">
+      <div class="card-header"><span class="card-title">Nueva Inspección</span></div>
+      <div class="card-body">
+        <div class="form-grid">
+
+          <div class="form-group">
+            <label>Fecha <span class="req">*</span></label>
+            <input type="date" id="f-fecha">
+          </div>
+
+          <div class="form-group">
+            <label>Horario</label>
+            <select id="f-horario">
+              <option value="">— Sin especificar —</option>
+            </select>
+          </div>
+
+          <div class="form-group full">
+            <label>Calle / Dirección <span class="req">*</span></label>
+            <input type="text" id="f-calle" placeholder="Ej: 42 entre 15 y 16">
+          </div>
+
+          <div class="form-group">
+            <label>Inspector <span class="req">*</span></label>
+            <select id="f-inspector">
+              <option value="">— Seleccionar —</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Legajo</label>
+            <div class="legajo-display" id="f-legajo">—</div>
+          </div>
+
+          <div class="form-group">
+            <label>Descripción de obra <span class="req">*</span></label>
+            <select id="f-concepto">
+              <option value="">— Seleccionar —</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Cant. tasas</label>
+            <input type="number" id="f-tasas" placeholder="0" min="0">
+          </div>
+
+          <div class="form-group">
+            <label>Tasa cobrada</label>
+            <select id="f-tasa">
+              <option value="1">Sí (1)</option>
+              <option value="0">No (0)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Nro. de boleta</label>
+            <input type="text" id="f-boleta" placeholder="065/26075…">
+          </div>
+
+          <div class="form-group">
+            <label>Nro. constructora</label>
+            <input type="text" id="f-nroconst" placeholder="">
+          </div>
+
+          <div class="form-group full">
+            <label>Observación</label>
+            <input type="text" id="f-obs" placeholder="Notas opcionales…">
+          </div>
+
+        </div>
+
+        <div style="display:flex; gap:10px; margin-top:20px;">
+          <button class="btn btn-primary" id="btn-guardar">💾 Guardar inspección</button>
+          <button class="btn btn-secondary" id="btn-limpiar">Limpiar</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- ── Toast container ────────────────────────────────────── -->
+<div class="toast-container" id="toasts"></div>
+
+<script>
+// ════════════════════════════════════════════════════════════
+// CONFIG — pegá la URL del Web App desplegado acá
+// ════════════════════════════════════════════════════════════
+const API = CONFIG.API_URL;
+
+// ════════════════════════════════════════════════════════════
+// Helpers
+// ════════════════════════════════════════════════════════════
+async function get(params) {
+  const url = API + "?" + new URLSearchParams(params);
+  const r = await fetch(url);
+  if (!r.ok) throw new Error("HTTP " + r.status);
+  return r.json();
+}
+
+async function post(body) {
+  const r = await fetch(API, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) throw new Error("HTTP " + r.status);
+  return r.json();
+}
+
+function toast(msg, tipo = "ok") {
+  const el = document.createElement("div");
+  el.className = "toast " + tipo;
+  el.innerHTML = (tipo === "ok" ? "✅" : "❌") + " " + msg;
+  document.getElementById("toasts").appendChild(el);
+  setTimeout(() => el.remove(), 4000);
+}
+
+function setConn(ok) {
+  document.getElementById("dot").className       = ok ? "dot" : "dot off";
+  document.getElementById("conn-label").textContent = ok ? "Conectado" : "Sin conexión";
+}
+
+// ════════════════════════════════════════════════════════════
+// Estado global
+// ════════════════════════════════════════════════════════════
+let INSPECTORES = [];   // [{nombre, legajo}]
+let MESES_DISP  = [];   // ["Enero", "Febrero", …]
+let tablaData   = [];   // filas cargadas en tab tabla
+let tablaPag    = 1;
+const POR_PAG   = 50;
+
+let chartTorta  = null;
+
+// ════════════════════════════════════════════════════════════
+// Init
+// ════════════════════════════════════════════════════════════
+async function init() {
+  try {
+    // Cargar catálogos en paralelo
+    const [inspectores, conceptos, horarios, meses] = await Promise.all([
+      get({ action: "inspectores" }),
+      get({ action: "conceptos"  }),
+      get({ action: "horarios"   }),
+      get({ action: "meses"      }),
+    ]);
+
+    INSPECTORES = inspectores;
+    MESES_DISP  = meses;
+    setConn(true);
+
+    // Poblar selectores
+    poblarSelect("f-inspector", inspectores.map(i => ({ value: i.nombre, label: i.nombre })));
+    poblarSelect("f-concepto",  conceptos.map(c => ({ value: c, label: c })));
+    poblarSelect("f-horario",   horarios.map(h => ({ value: h, label: h })));
+
+    // Selectores de mes en stats y tabla
+    const statsOpts = [{ value: "anual", label: "Anual (todos los meses)" }];
+    meses.forEach(m => statsOpts.push({ value: m, label: m }));
+    poblarSelect("stats-mes-sel", statsOpts, false);
+
+    poblarSelect("tabla-mes-sel", meses.map(m => ({ value: m, label: m })), false);
+
+    // Fecha de hoy en formulario
+    document.getElementById("f-fecha").value = new Date().toISOString().slice(0, 10);
+
+    // Cargar stats inicial (anual)
+    cargarStats("anual");
+
+  } catch(e) {
+    setConn(false);
+    toast("No se pudo conectar con el servidor. Verificá la URL del Web App.", "err");
+    console.error(e);
+  }
+}
+
+function poblarSelect(id, opciones, conVacio = true) {
+  const sel = document.getElementById(id);
+  const prev = sel.value;
+  sel.innerHTML = "";
+  if (conVacio) sel.innerHTML = `<option value="">— Seleccionar —</option>`;
+  opciones.forEach(op => {
+    const o = document.createElement("option");
+    o.value = op.value;
+    o.textContent = op.label;
+    sel.appendChild(o);
+  });
+  if (prev) sel.value = prev;
+}
+
+// ════════════════════════════════════════════════════════════
+// ESTADÍSTICAS
+// ════════════════════════════════════════════════════════════
+const COLORES = [
+  "#1a56db","#22c55e","#f59e0b","#ef4444","#8b5cf6",
+  "#06b6d4","#f97316","#64748b","#ec4899"
+];
+
+async function cargarStats(mes) {
+  document.getElementById("kpi-total").textContent = "…";
+  document.getElementById("kpi-dias").textContent  = "…";
+  document.getElementById("kpi-insp").textContent  = "…";
+  document.getElementById("kpi-tasas").textContent = "…";
+  document.getElementById("insp-list").innerHTML   = "";
+  document.querySelector("#tbl-concepto tbody").innerHTML = "";
+
+  try {
+    const s = await get({ action: "stats", mes });
+
+    document.getElementById("kpi-total").textContent = s.totalRegistros;
+    document.getElementById("kpi-dias").textContent  = s.diasUnicos;
+    document.getElementById("kpi-insp").textContent  = s.inspectoresUnicos;
+    document.getElementById("kpi-tasas").textContent = s.totalTasas;
+
+    renderTorta(s.porConcepto, s.totalRegistros);
+    renderInspList(s.porInspector);
+    renderTablaConcepto(s.porConcepto, s.totalRegistros);
+
+  } catch(e) {
+    toast("Error al cargar estadísticas: " + e.message, "err");
+  }
+}
+
+function renderTorta(porConcepto, total) {
+  const labels = [], datos = [], colores = [];
+  let idx = 0;
+  for (const [k, v] of Object.entries(porConcepto)) {
+    if (v > 0) {
+      labels.push(k);
+      datos.push(v);
+      colores.push(COLORES[idx++ % COLORES.length]);
+    }
+  }
+
+  if (chartTorta) chartTorta.destroy();
+  const ctx = document.getElementById("chart-torta").getContext("2d");
+  chartTorta = new Chart(ctx, {
+    type: "doughnut",
+    data: { labels, datasets: [{ data: datos, backgroundColor: colores, borderWidth: 2, borderColor: "#fff" }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: "bottom", labels: { font: { size: 11 }, padding: 10, boxWidth: 12 } },
+        tooltip: {
+          callbacks: {
+            label: ctx => {
+              const pct = total > 0 ? Math.round(ctx.parsed / total * 100) : 0;
+              return ` ${ctx.label}: ${ctx.parsed} (${pct}%)`;
+            }
+          }
+        }
+      }
+    }
+  });
+}
+
+function renderInspList(inspectores) {
+  const max = inspectores.length ? inspectores[0].cantidad : 1;
+  const ul = document.getElementById("insp-list");
+  ul.innerHTML = inspectores.map(({ nombre, cantidad }) => `
+    <div class="insp-row">
+      <span class="insp-name">${nombre}</span>
+      <div class="insp-bar-wrap">
+        <div class="insp-bar" style="width:${Math.round(cantidad/max*100)}%"></div>
+      </div>
+      <span class="insp-num">${cantidad}</span>
+    </div>
+  `).join("");
+}
+
+function renderTablaConcepto(porConcepto, total) {
+  const tbody = document.querySelector("#tbl-concepto tbody");
+  const entries = Object.entries(porConcepto).filter(([,v]) => v > 0)
+    .sort((a, b) => b[1] - a[1]);
+  tbody.innerHTML = entries.map(([concepto, cant]) => {
+    const pct = total > 0 ? (cant / total * 100).toFixed(1) : 0;
+    return `<tr>
+      <td>${concepto}</td>
+      <td><strong>${cant}</strong></td>
+      <td>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div style="flex:1;height:6px;background:var(--gris-2);border-radius:3px;overflow:hidden;">
+            <div style="width:${pct}%;height:100%;background:var(--azul);border-radius:3px;"></div>
+          </div>
+          <span style="color:var(--gris-4);font-size:.78rem;min-width:38px">${pct}%</span>
+        </div>
+      </td>
+    </tr>`;
+  }).join("");
+}
+
+// ════════════════════════════════════════════════════════════
+// TABLA DE REGISTROS
+// ════════════════════════════════════════════════════════════
+function badgeConcepto(c) {
+  const map = {
+    "Hormigón":                "badge-h",
+    "Descarga":                "badge-d",
+    "Evento":                  "badge-ev",
+    "Grúa / Equipo":           "badge-g",
+    "Retiro de escombros/tierra":"badge-r",
+    "Trabajo de obra":         "badge-t",
+    "Demolición / Construcción":"badge-e",
+    "Extracción de árbol":     "badge-d",
+    "Otro / Revisar":          "badge-o",
+  };
+  const cls = map[c] || "badge-o";
+  return `<span class="badge ${cls}">${c}</span>`;
+}
+
+async function cargarTabla(mes) {
+  document.getElementById("tbl-body").innerHTML =
+    `<tr><td colspan="8" class="empty"><div class="skeleton" style="width:60%;margin:auto;height:12px;"></div></td></tr>`;
+  try {
+    tablaData = await get({ action: "tabla", mes });
+    tablaPag = 1;
+    renderTabla();
+  } catch(e) {
+    toast("Error al cargar tabla: " + e.message, "err");
+  }
+}
+
+function filasFiltradas() {
+  const q = document.getElementById("tabla-search").value.toLowerCase().trim();
+  if (!q) return tablaData;
+  return tablaData.filter(f =>
+    [f.fecha, f.calle, f.inspector, f.concepto, f.boleta, f.obs]
+      .some(v => String(v || "").toLowerCase().includes(q))
+  );
+}
+
+function renderTabla() {
+  const filas = filasFiltradas();
+  const total = filas.length;
+  const totalPags = Math.max(1, Math.ceil(total / POR_PAG));
+  if (tablaPag > totalPags) tablaPag = totalPags;
+
+  const start = (tablaPag - 1) * POR_PAG;
+  const page  = filas.slice(start, start + POR_PAG);
+
+  const tbody = document.getElementById("tbl-body");
+  if (!page.length) {
+    tbody.innerHTML = `<tr><td colspan="8"><div class="empty"><div class="empty-icon">🔍</div>Sin resultados</div></td></tr>`;
+  } else {
+    tbody.innerHTML = page.map(f => `
+      <tr>
+        <td style="white-space:nowrap;font-variant-numeric:tabular-nums">${f.fecha || "—"}</td>
+        <td>${f.calle || "—"}</td>
+        <td style="white-space:nowrap">${f.horario || "—"}</td>
+        <td><strong>${f.inspector}</strong></td>
+        <td>${badgeConcepto(f.concepto)}</td>
+        <td style="text-align:center">${f.tasas || "—"}</td>
+        <td style="font-size:.76rem;color:var(--gris-4)">${f.boleta || "—"}</td>
+        <td style="font-size:.78rem;color:var(--gris-4)">${f.obs || ""}</td>
+      </tr>
+    `).join("");
+  }
+
+  // Paginación
+  const pag = document.getElementById("pagination");
+  pag.innerHTML = `<span>${total} registros</span><div class="page-spacer"></div>`;
+  if (totalPags > 1) {
+    const makeBtn = (label, p, active = false) => {
+      const b = document.createElement("button");
+      b.className = "page-btn" + (active ? " active" : "");
+      b.textContent = label;
+      b.onclick = () => { tablaPag = p; renderTabla(); };
+      return b;
+    };
+    if (tablaPag > 1) pag.appendChild(makeBtn("←", tablaPag - 1));
+    for (let p = Math.max(1, tablaPag - 2); p <= Math.min(totalPags, tablaPag + 2); p++) {
+      pag.appendChild(makeBtn(p, p, p === tablaPag));
+    }
+    if (tablaPag < totalPags) pag.appendChild(makeBtn("→", tablaPag + 1));
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+// FORMULARIO DE CARGA
+// ════════════════════════════════════════════════════════════
+function autoLegajo() {
+  const nombre = document.getElementById("f-inspector").value;
+  const insp = INSPECTORES.find(i => i.nombre === nombre);
+  const legajo = insp && insp.legajo ? insp.legajo : "—";
+  document.getElementById("f-legajo").textContent = legajo;
+}
+
+async function guardarInspeccion() {
+  const fecha    = document.getElementById("f-fecha").value;
+  const calle    = document.getElementById("f-calle").value.trim();
+  const inspector= document.getElementById("f-inspector").value;
+  const concepto = document.getElementById("f-concepto").value;
+
+  if (!fecha)     { toast("Ingresá la fecha",           "err"); return; }
+  if (!calle)     { toast("Ingresá la dirección",       "err"); return; }
+  if (!inspector) { toast("Seleccioná un inspector",    "err"); return; }
+  if (!concepto)  { toast("Seleccioná el tipo de obra", "err"); return; }
+
+  // Convertir fecha de YYYY-MM-DD a DD/MM/YYYY
+  const [y, m, d] = fecha.split("-");
+  const fechaFmt = `${d}/${m}/${y}`;
+
+  const btn = document.getElementById("btn-guardar");
+  btn.disabled = true;
+  btn.textContent = "Guardando…";
+
+  try {
+    const res = await post({
+      accion:    "cargar",
+      fecha:     fechaFmt,
+      calle,
+      horario:   document.getElementById("f-horario").value,
+      tasas:     document.getElementById("f-tasas").value,
+      boleta:    document.getElementById("f-boleta").value.trim(),
+      nroConst:  document.getElementById("f-nroconst").value.trim(),
+      inspector,
+      tasa:      document.getElementById("f-tasa").value,
+      concepto,
+      obs:       document.getElementById("f-obs").value.trim(),
+    });
+
+    if (res.ok) {
+      toast(`Guardado en ${res.mes}, fila ${res.fila}`);
+      limpiarFormulario();
+    } else {
+      toast("Error: " + res.error, "err");
+    }
+  } catch(e) {
+    toast("Error de conexión: " + e.message, "err");
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = "💾 Guardar inspección";
+  }
+}
+
+function limpiarFormulario() {
+  document.getElementById("f-fecha").value    = new Date().toISOString().slice(0, 10);
+  document.getElementById("f-calle").value    = "";
+  document.getElementById("f-horario").value  = "";
+  document.getElementById("f-tasas").value    = "";
+  document.getElementById("f-boleta").value   = "";
+  document.getElementById("f-nroconst").value = "";
+  document.getElementById("f-inspector").value= "";
+  document.getElementById("f-tasa").value     = "1";
+  document.getElementById("f-concepto").value = "";
+  document.getElementById("f-obs").value      = "";
+  document.getElementById("f-legajo").textContent = "—";
+}
+
+// ════════════════════════════════════════════════════════════
+// TABS
+// ════════════════════════════════════════════════════════════
+document.querySelectorAll(".nav-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
+    document.querySelectorAll(".section").forEach(s => s.classList.remove("active"));
+    btn.classList.add("active");
+    document.getElementById("tab-" + btn.dataset.tab).classList.add("active");
+  });
+});
+
+// ════════════════════════════════════════════════════════════
+// Event listeners
+// ════════════════════════════════════════════════════════════
+document.getElementById("btn-cargar-stats").addEventListener("click", () => {
+  cargarStats(document.getElementById("stats-mes-sel").value);
+});
+
+document.getElementById("btn-cargar-tabla").addEventListener("click", () => {
+  const mes = document.getElementById("tabla-mes-sel").value;
+  if (mes) cargarTabla(mes);
+});
+
+document.getElementById("tabla-search").addEventListener("input", () => {
+  tablaPag = 1; renderTabla();
+});
+
+document.getElementById("f-inspector").addEventListener("change", autoLegajo);
+
+document.getElementById("btn-guardar").addEventListener("click", guardarInspeccion);
+document.getElementById("btn-limpiar").addEventListener("click", limpiarFormulario);
+
+// ════════════════════════════════════════════════════════════
+// Arrancar
+// ════════════════════════════════════════════════════════════
+init();
+</script>
+<script src="config.js"></script>
+</body>
+</html>
